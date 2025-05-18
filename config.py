@@ -1,26 +1,24 @@
-from pydantic_settings import BaseSettings
-from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+# Загружаем переменные из .env
+load_dotenv()
 
 
-class Settings(BaseSettings):
-    # Токен бота из BotFather
-    TELEGRAM_TOKEN: str
+class Config:
+    # Токен бота из @BotFather
+    TOKEN = os.getenv("TELEGRAM_TOKEN")
 
     # Настройки Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-    # Настройки Google Sheets
-    GOOGLE_SHEETS_CREDENTIALS: str = "path/to/credentials.json"
-    SPREADSHEET_ID: str
+    # Google Sheets
+    GSHEETS_CREDENTIALS = os.getenv("GSHEETS_CREDENTIALS", "path/to/credentials.json")
+    SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 
-    # API ключ для анализа чеков
-    DEEPSEEK_API_KEY: str = ""
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = 'utf-8'
+    # DeepSeek API
+    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
 
 
-def load_config() -> Settings:
-    """Загружает конфигурацию из .env файла"""
-    return Settings()
+# Создаем экземпляр конфига
+config = Config()
