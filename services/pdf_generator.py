@@ -1,36 +1,22 @@
 import pdfkit
 from jinja2 import Environment, FileSystemLoader
+
+
 import os
-from datetime import datetime
-from typing import Dict
 import logging
 
 logger = logging.getLogger(__name__)
 
+env = Environment(loader=FileSystemLoader("templates"))
 
-class PDFGenerator:
-    def __init__(self, templates_dir: str = "templates"):
-        self.env = Environment(
-            loader=FileSystemLoader(templates_dir),
-            autoescape=True
-        )
 
-    def generate_guarantee_certificate(self, data: Dict) -> str:
-        """
-        Генерирует PDF сертификат гарантии
-        Параметры:
-            data (Dict): Данные для сертификата
-        Возвращает:
-            str: Путь к файлу PDF
-        """
-        try:
-            template = self.env.get_template("guarantee.html")
-            html = template.render(data)
+def generate_guarantee_certificate(data: dict) -> str:
+    """Генерирует PDF сертификат гарантии"""
+    template = env.get_template("guarantee.html")
+    html = template.render(data)
 
-            output_path = f"temp/guarantee_{data['order_id']}.pdf"
-            pdfkit.from_string(html, output_path)
+    os.makedirs("certificates", exist_ok=True)
+    filename = f"certificates/guarantee_{data['order_id']}.pdf"
 
-            return output_path
-        except Exception as e:
-            logger.error(f"Error generating PDF: {e}")
-            raise
+    pdfkit.from_string(html, filename)
+    return filename

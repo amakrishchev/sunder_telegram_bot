@@ -1,12 +1,12 @@
 from aiogram import types, Dispatcher
-from services.google_sheets import get_product_categories
+from services.google_sheets import GoogleSheetsService
 
 
 async def start_instructions(message: types.Message):
     """
     Начало воронки получения инструкций.
     """
-    categories = await get_product_categories()
+    categories = await GoogleSheetsService.get_product_categories()
 
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     keyboard.add(*categories)

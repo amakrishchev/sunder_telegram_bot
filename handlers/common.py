@@ -1,42 +1,29 @@
-from aiogram import types, Dispatcher
+from aiogram import Router, types
 from aiogram.filters import Command
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
+
+router = Router()
 
 
+@router.message(Command("start"))
 async def cmd_start(message: types.Message):
-    """
-    Обработчик команды /start.
-    Показывает главное меню с кнопками.
-    """
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    builder = ReplyKeyboardBuilder()
     buttons = [
         "✅ Получить +2 года гарантии",
         "📖 Инструкции на товары",
         "⚠️ Проблема с товаром",
         "📨 Написать менеджеру"
     ]
-    keyboard.add(*buttons)
+    for button in buttons:
+        builder.add(types.KeyboardButton(text=button))
+    builder.adjust(1)
 
     await message.answer(
-        "Добро пожаловать в бота Sunder для Ozon!\n"
-        "Выберите нужный вариант:",
-        reply_markup=keyboard
+        "Добро пожаловать в бота Sunder для Ozon!",
+        reply_markup=builder.as_markup(resize_keyboard=True)
     )
 
 
+@router.message(Command("help"))
 async def cmd_help(message: types.Message):
-    """Обработчик команды /help."""
-    await message.answer(
-        "Помощь по боту:\n"
-        "✅ Гарантия - оформите расширенную гарантию\n"
-        "📖 Инструкции - получите инструкции к товарам\n"
-        "⚠️ Проблемы - сообщите о проблеме с товаром\n"
-        "📨 Менеджер - свяжитесь с менеджером"
-    )
-
-
-def register_common_handlers(dp: Dispatcher):
-    """
-    Регистрирует общие обработчики команд.
-    """
-    dp.register_message_handler(cmd_start, Command("start"))
-    dp.register_message_handler(cmd_help, Command("help"))
+    await message.answer("Справка по боту...")

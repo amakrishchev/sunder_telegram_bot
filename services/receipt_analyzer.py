@@ -1,96 +1,87 @@
-import requests
-import logging
-from typing import Optional, Dict
-from pydantic import BaseModel
+import os
 import base64
 import httpx
+from pydantic import BaseModel, Field
+from config import load_config
+import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-class ReceiptData(BaseModel):
-    article: str
-    product_name: str
-    purchase_date: str
-    price: float
 
-class DeepSeekAnalyzer:
-    def __init__(self, api_key: str, api_url: str = "https://api.deepseek.com/v1"):
-        self.api_key = api_key
-        self.api_url = api_url
-        self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
+class ReceiptData(BaseModel):
+    article: str = Field(..., alias="артикул")
+    product_name: str = Field(..., alias="название товара")
+    purchase_date: str = Field(..., alias="дата покупки")
+    price: float = Field(..., alias="цена")
+
+
+class ReceiptAnalyzer:
+    def __init__(self):
+        self.config = load_config()
+        self.timeout = 30.0
+
+    async def _make_api_request(self, base64_image: str) -> Optional[dict]:
+        """Отправляет запрос к DeepSeek API"""
+        headers = {
+            "Authorization": f"Bearer {self.config.DEEPSEEK_API_KEY}",
             "Content-Type": "application/json"
         }
 
-    async def _encode_image(self, image_path: str) -> str:
-        """Кодирует изображение в base64"""
-        with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+        payload = {
+            "model": "deepseek-vision",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Извлеки из чека: артикул (только цифры), название товара, дату покупки (дд.мм.гггг), цену. Верни JSON."
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    ]
+                }
+            ],
+            "max_tokens": 500
+        }
 
-    async def analyze_receipt(self, image_path: str) -> Optional[ReceiptData]:
-        """
-        Анализирует чек через DeepSeek API
-        Параметры:
-            image_path (str): Путь к изображению чека
-        Возвращает:
-            Optional[ReceiptData]: Распознанные данные или None
-        """
         try:
-            # Кодируем изображение
-            base64_image = await self._encode_image(image_path)
-
-            # Формируем промпт
-            prompt = """
-            Проанализируй изображение чека Ozon и извлеки следующую информацию:
-            1. Артикул товара (только цифры)
-            2. Полное название товара
-            3. Дату покупки в формате ДД.ММ.ГГГГ
-            4. Цену товара (только число)
-
-            Верни ответ в формате JSON со следующими полями:
-            {
-                "article": "артикул",
-                "product_name": "название товара",
-                "purchase_date": "дата покупки",
-                "price": цена
-            }
-            """
-
-            # Формируем тело запроса
-            payload = {
-                "model": "deepseek-vision",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        ]
-                    }
-                ],
-                "max_tokens": 1000
-            }
-
-            # Отправляем запрос
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    f"{self.api_url}/chat/completions",
-                    headers=self.headers,
+                    "https://api.deepseek.com/v1/chat/completions",
+                    headers=headers,
                     json=payload,
-                    timeout=30.0
+                    timeout=self.timeout
                 )
+                response.raise_for_status()
+                return response.json()
+        except Exception as e:
+            logger.error(f"API request failed: {e}")
+            return None
 
-                if response.status_code == 200:
-                    result = response.json()
-                    content = result['choices'][0]['message']['content']
-                    return ReceiptData.parse_raw(content)
-                else:
-                    logger.error(f"DeepSeek API error: {response.text}")
-                    return None
+    async def analyze_receipt(self, image_path: str):
+        """Анализирует чек и возвращает структурированные данные"""
+        try:
+            if not os.path.exists(image_path):
+                raise FileNotFoundError(f"Image not found: {image_path}")
+
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+
+            response = await self._make_api_request(base64_image)
+            if not response:
+                return None
+
+            content = response['choices'][0]['message']['content']
+            return ReceiptData.model_validate_json(content)
 
         except Exception as e:
-            logger.error(f"Error analyzing receipt with DeepSeek: {e}")
+            logger.error(f"Receipt analysis error: {e}")
             return None
+
+
+# Глобальный экземпляр для использования в хендлерах
+receipt_analyzer = ReceiptAnalyzer()

@@ -1,91 +1,54 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from pydantic import BaseModel
-from typing import List, Dict  # , Optional
+from config import load_config
 import logging
+from datetime import datetime
 
-# Настройка логгера
 logger = logging.getLogger(__name__)
+config = load_config()
 
 
-class ProductData(BaseModel):
-    article: str
-    name: str
-    category: str
-    manual_link: str
-    image_link: str
-    ozon_link: str
-    promo_code: str
-
-
-class ClientData(BaseModel):
-    name: str
-    phone: str
-    product_link: str
-    article: str
-    product_name: str
-    purchase_date: str
-    warranty_end: str
-    promo_code: str
-    status: str = "new"
-
-
-class GoogleSheetsService:
-    def __init__(self, credentials_path: str):
+class GoogleSheetsClient:
+    def __init__(self):
         scope = [
             'https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive'
         ]
-        creds = ServiceAccountCredentials.from_json_keyfile_name(credentials_path, scope)
+        creds = ServiceAccountCredentials.from_json_keyfile_name(
+            config.GOOGLE_SHEETS_CREDENTIALS, scope)
         self.client = gspread.authorize(creds)
+        self.sheet = None
 
-    def _get_sheet(self, spreadsheet_id: str, sheet_name: str):
-        """Получает лист таблицы по ID и названию"""
+    async def connect(self, sheet_name: str):
+        """Подключается к указанному листу"""
         try:
-            spreadsheet = self.client.open_by_key(spreadsheet_id)
-            return spreadsheet.worksheet(sheet_name)
-        except Exception as e:
-            logger.error(f"Error accessing sheet: {e}")
-            raise
-
-    async def get_product_categories(self) -> List[str]:
-        """
-        Получает список уникальных категорий товаров
-        Возвращает:
-            List[str]: Список категорий
-        """
-        sheet = self._get_sheet("SPREADSHEET_ID", "Products")
-        records = sheet.get_all_records()
-        return list(set([item['category'] for item in records]))
-
-    async def get_products_by_category(self, category: str) -> List[ProductData]:
-        """
-        Получает товары по категории
-        Параметры:
-            category (str): Название категории
-        Возвращает:
-            List[ProductData]: Список товаров
-        """
-        sheet = self._get_sheet("SPREADSHEET_ID", "Products")
-        records = sheet.get_all_records()
-        return [ProductData(**item) for item in records if item['category'] == category]
-
-    async def add_guarantee_request(self, data: ClientData) -> bool:
-        """
-        Добавляет запрос на гарантию в таблицу
-        Параметры:
-            data (ClientData): Данные клиента
-        Возвращает:
-            bool: Успешность операции
-        """
-        try:
-            sheet = self._get_sheet("SPREADSHEET_ID", "Clients")
-            sheet.append_row(list(data.dict().values()))
+            spreadsheet = self.client.open_by_key(config.SPREADSHEET_ID)
+            self.sheet = spreadsheet.worksheet(sheet_name)
             return True
         except Exception as e:
-            logger.error(f"Error adding guarantee request: {e}")
+            logger.error(f"Google Sheets connection error: {e}")
             return False
 
-    async def add_problem_request(self, data: Dict) -> bool:
-        """Аналогично add_guarantee_request для проблем"""
-        pass
+    async def add_guarantee_request(self, data: dict) -> bool:
+        """Добавляет запрос на гарантию в таблицу"""
+        try:
+            if not self.sheet:
+                await self.connect("Гарантии")
+
+            row = [
+                data["name"],
+                data["phone"],
+                data["product_link"],
+                data["article"],
+                data["product_name"],
+                data["purchase_date"],
+                data["warranty_end"],
+                data["promo_code"],
+                data["status"],
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ]
+            self.sheet.append_row(row)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add guarantee request: {e}")
+            return False

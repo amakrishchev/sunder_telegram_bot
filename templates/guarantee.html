@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Гарантийный сертификат</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .certificate { border: 2px solid #000; padding: 20px; }
+        .header { text-align: center; }
+        .logo { width: 150px; }
+    </style>
+</head>
+<body>
+    <div class="certificate">
+        <div class="header">
+            <h1>Гарантийный сертификат</h1>
+            <p>Бренд Sunder • Ozon</p>
+        </div>
+        
+        <div class="content">
+            <p>Клиент: <strong>{{ client_name }}</strong></p>
+            <p>Товар: {{ product_name }}</p>
+            <p>Дата покупки: {{ purchase_date }}</p>
+            <p>Гарантия действительна до: {{ warranty_end }}</p>
+            <p>Номер сертификата: {{ order_id }}</p>
+        </div>
+    </div>
+</body>
+</html>
