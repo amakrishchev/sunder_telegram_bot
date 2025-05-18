@@ -20,55 +20,33 @@ class Register(StatesGroup):
 async def cmd_start(message: Message):
     await rq.set_user(message.from_user.id)
     await message.answer(
-        "Добро пожаловать в магазин 'Sunder'",
+        text="Добро пожаловать в магазин 'Sunder'",
         reply_markup=kb.main
     )
 
 
-@router.message(Command('help'))
-async def cmd_help(message: Message):
-    await message.answer('Вы нажали на кнопку помощи')
-
-
 @router.message(F.text == 'Каталог')
 async def catalog(message: Message):
-    await message.answer('Выберите категорию товара', reply_markup=kb.catalog)
-
-
-@router.callback_query(F.data == 't-shirt')
-async def get_t_shirt(callback: CallbackQuery):
-    await callback.answer('Вы выбрали категорию футболок', show_alert=True)
-    # await callback.message.answer('Вы выбрали категорию футболок')
-
-
-@router.message(Command('register'))
-async def register(message: Message, state: FSMContext):
-    await state.set_state(Register.name)
-    await message.answer('Введите Ваше имя')
-
-
-@router.message(Register.name)
-async def register_name(message: Message, state: FSMContext):
-    await state.update_data(name=message.text)
-    await state.set_state(Register.age)
-    await message.answer('Введите Ваш возраст')
-
-
-@router.message(Register.age)
-async def register_age(message: Message, state: FSMContext):
-    await state.update_data(age=message.text)
-    await state.set_state(Register.number)
     await message.answer(
-        'Введите Ваш номер телефона',
-        reply_markup=kb.get_number
+        text='Выберите категорию товара',
+        reply_markup=await kb.categories()
     )
 
 
-@router.message(Register.number, F.contact)
-async def register_number(message: Message, state: FSMContext):
-    await state.update_data(number=message.contact.phone_number)
-    data = await state.get_data()
-    await message.answer(
-        f'''Ваше имя: {data['name']}\nВаш возраст: {data['age']}\nВаш номер телефона: {data['number']}'''
+@router.callback_query(F.data.startswith('category_'))
+async def category(callback: CallbackQuery):
+    await callback.answer('Вы выбрали категорию')
+    await callback.message.answer(
+        text='Выберите товар по категории',
+        reply_markup=await kb.items(callback.data.split('_')[1])
     )
-    await state.clear()
+
+
+@router.callback_query(F.data.startswith('item_'))
+async def item(callback: CallbackQuery):
+    item_data = await rq.get_item(callback.data.split('_')[1])
+    await callback.answer('Вы выбрали товар')
+    await callback.message.answer(
+        text=f'Название: {item_data.name}\nОписание: {item_data.description}\nЦена: {item_data.price}$',
+        reply_markup=await kb.items(callback.data.split('_')[1])
+    )
