@@ -23,6 +23,7 @@ async def get_category_item(category_id):
             select(Item).where(Item.id == category_id)
         )
 
+
 async def get_item(item_id):
     async with async_session() as session:
         return await session.scalar(
